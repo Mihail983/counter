@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Counter — plus/minus</title>
+  <style>
+    /* базовая разметка и фон страницы */
+    :root{
+      --bg-grad-1: linear-gradient(135deg,#2b5876 0%, #4e4376 100%);
+      --btn-radius: 5px;
+      --result-size: 140px;
+      --yellow: #FFEB3B;
+      --green: #8BC34A;
+      --red: #F44336;
+      --btn-gradient-a: linear-gradient(180deg,#6dd5ed 0%,#2193b0 100%);
+      --btn-gradient-b: linear-gradient(180deg,#fbc2eb 0%,#a6c1ee 100%);
+      --text-color-dark: #222;
+      --text-color-light: #fff;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      font-family: Inter, Roboto, "Segoe UI", Arial, sans-serif;
+      background: var(--bg-grad-1);
+      color:var(--text-color-light);
+    }
+
+    /* центрируем всё по центру экрана */
+    .page {
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      box-sizing:border-box;
+    }
+
+    .card{
+      background: rgba(255,255,255,0.06);
+      border-radius:12px;
+      padding:28px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      align-items:center;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+      backdrop-filter: blur(6px);
+      width: min(520px, 94vw);
+    }
+
+    .title{
+      margin:0;
+      font-size:20px;
+      font-weight:600;
+      color: #fff;
+      text-align:center;
+    }
+
+    /* area with controls */
+    .controls{
+      display:flex;
+      gap:18px;
+      align-items:center;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+
+    /* кнопки */
+    button.counter-btn{
+      border: none;
+      padding: 12px 18px;
+      font-size:18px;
+      font-weight:600;
+      border-radius: var(--btn-radius);
+      cursor:pointer;
+      min-width:64px;
+      transition: transform .12s ease, opacity .12s ease, box-shadow .12s ease;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+      color: var(--text-color-dark);
+      /* градиент фона */
+      background-image: var(--btn-gradient-a);
+    }
+
+    /* второй стиль для минус (чтобы были разные, красиво) */
+    button.counter-btn.minus{
+      background-image: var(--btn-gradient-b);
+    }
+
+    button.counter-btn:active{
+      transform: translateY(1px) scale(.997);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    button.counter-btn:focus{
+      outline: 3px solid rgba(255,255,255,0.12);
+      outline-offset: 2px;
+    }
+
+    button.counter-btn[disabled]{
+      opacity:0.46;
+      cursor: not-allowed;
+      transform:none;
+      box-shadow:none;
+    }
+
+    /* окно результата */
+    .result{
+      width:var(--result-size);
+      height:var(--result-size);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:34px;
+      font-weight:700;
+      border-radius:10px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+      transition: background-color .18s ease, color .12s ease, transform .12s ease;
+      user-select:none;
+    }
+
+    /* сообщения под кнопками */
+    .message{
+      min-height:24px;
+      font-size:15px;
+      text-align:center;
+      color: #fff;
+      opacity:0;
+      transition: opacity .18s ease;
+    }
+    .message.visible{
+      opacity:1;
+    }
+
+    /* маленькая подсказка */
+    .hint{
+      font-size:13px;
+      color: rgba(255,255,255,0.75);
+      text-align:center;
+    }
+
+    /* адаптив */
+    @media (max-width:420px){
+      .result{
+        width:110px; height:110px; font-size:28px;
+      }
+      .card{ padding:18px; gap:12px; }
+      button.counter-btn{ font-size:16px; padding:10px 14px; min-width:56px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card" role="main" aria-labelledby="title">
+      <h1 id="title" class="title">Простейший счётчик</h1>
+
+      <div class="controls" aria-hidden="false">
+        <button id="minusBtn" class="counter-btn minus" type="button" aria-label="минус">−</button>
+
+        <div id="result" class="result" role="status" aria-live="polite" aria-atomic="true">0</div>
+
+        <button id="plusBtn" class="counter-btn plus" type="button" aria-label="плюс">+</button>
+      </div>
+
+      <div id="message" class="message" aria-live="polite"></div>
+      <div class="hint">При достижении 10 или −10 появится сообщение, соответствующая кнопка станет неактивной.</div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      // элементы
+      const plusBtn = document.getElementById('plusBtn');
+      const minusBtn = document.getElementById('minusBtn');
+      const resultEl = document.getElementById('result');
+      const messageEl = document.getElementById('message');
+
+      // текущее значение
+      let value = 0;
+
+      // границы
+      const MAX = 10;
+      const MIN = -10;
+
+      // вспомогательная функция для обновления внешнего вида
+      function updateUI(){
+        // обновим число отображения
+        resultEl.textContent = String(value);
+
+        // фон в зависимости от значения:
+        // положительное -> жёлтый, отрицательное -> зелёный, ноль -> красный
+        if (value > 0){
+          resultEl.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--yellow') || '#FFEB3B';
+          // на желтом текст лучше тёмный
+          resultEl.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text-color-dark') || '#222';
+        } else if (value < 0){
+          resultEl.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--green') || '#8BC34A';
+          resultEl.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text-color-light') || '#fff';
+        } else {
+          resultEl.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--red') || '#F44336';
+          resultEl.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text-color-light') || '#fff';
+        }
+
+        // блокировка кнопок при достижении границ
+        plusBtn.disabled = (value >= MAX);
+        minusBtn.disabled = (value <= MIN);
+
+        // показать/скрыть сообщение
+        if (value === MAX || value === MIN){
+          messageEl.textContent = 'вы достигли экстремального значения';
+          messageEl.classList.add('visible');
+        } else {
+          messageEl.textContent = '';
+          messageEl.classList.remove('visible');
+        }
+      }
+
+      // обработчики
+      plusBtn.addEventListener('click', function(){
+        if (value >= MAX) return;      // защита от лишних кликов
+        value = value + 1;
+        if (value > MAX) value = MAX;  
+        updateUI();
+      });
+
+      minusBtn.addEventListener('click', function(){
+        if (value <= MIN) return;
+        value = value - 1;
+        if (value < MIN) value = MIN;
+        updateUI();
+      });
+
+      // начальная отрисовка
+      updateUI();
+
+      // необязательно: поддержка клавиш стрелок вверх/вниз и +/- на клавиатуре
+      window.addEventListener('keydown', function(e){
+        if (e.key === 'ArrowUp' || e.key === '+'){
+          e.preventDefault();
+          plusBtn.click();
+        } else if (e.key === 'ArrowDown' || e.key === '-'){
+          e.preventDefault();
+          minusBtn.click();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
